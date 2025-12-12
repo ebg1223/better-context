@@ -1,6 +1,6 @@
 import type { Config as OpenCodeConfig } from "@opencode-ai/sdk";
+import { FileSystem, Path } from "@effect/platform";
 import { Effect, Schema } from "effect";
-import * as path from "node:path";
 import { getDocsAgentPrompt } from "../lib/prompts.ts";
 import { ConfigError } from "../lib/errors.ts";
 import { cloneRepo, pullRepo } from "../lib/utils/git.ts";
@@ -16,8 +16,6 @@ const repoSchema = Schema.Struct({
   url: Schema.String,
   branch: Schema.String,
 });
-
-type Repo = typeof repoSchema.Type;
 
 const configSchema = Schema.Struct({
   promptsDirectory: Schema.String,
@@ -59,104 +57,127 @@ const DEFAULT_CONFIG: Config = {
 
 const OPENCODE_CONFIG = (args: {
   repoName: string;
-  config: Config;
-}): OpenCodeConfig => ({
-  agent: {
-    build: {
-      disable: true,
-    },
-    explore: {
-      disable: true,
-    },
-    general: {
-      disable: true,
-    },
-    plan: {
-      disable: true,
-    },
-    ask: {
-      disable: true,
-    },
-    docs: {
-      prompt: getDocsAgentPrompt({
-        repoName: args.repoName,
-        repoPath: path.join(args.config.reposDirectory, args.repoName),
-      }),
-      disable: false,
-      description:
-        "Get answers about libraries and frameworks by searching their source code",
-      permission: {
-        webfetch: "deny",
-        edit: "deny",
-        bash: "allow",
-        external_directory: "allow",
-        doom_loop: "deny",
+  reposDirectory: string;
+}): Effect.Effect<OpenCodeConfig, never, Path.Path> =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    return {
+      agent: {
+        build: {
+          disable: true,
+        },
+        explore: {
+          disable: true,
+        },
+        general: {
+          disable: true,
+        },
+        plan: {
+          disable: true,
+        },
+        ask: {
+          disable: true,
+        },
+        docs: {
+          prompt: getDocsAgentPrompt({
+            repoName: args.repoName,
+            repoPath: path.join(args.reposDirectory, args.repoName),
+          }),
+          disable: false,
+          description:
+            "Get answers about libraries and frameworks by searching their source code",
+          permission: {
+            webfetch: "deny",
+            edit: "deny",
+            bash: "allow",
+            external_directory: "allow",
+            doom_loop: "deny",
+          },
+          mode: "primary",
+          tools: {
+            write: false,
+            bash: true,
+            delete: false,
+            read: true,
+            grep: true,
+            glob: true,
+            list: true,
+            path: false,
+            todowrite: false,
+            todoread: false,
+            websearch: false,
+          },
+        },
       },
-      mode: "primary",
-      tools: {
-        write: false,
-        bash: true,
-        delete: false,
-        read: true,
-        grep: true,
-        glob: true,
-        list: true,
-        path: false,
-        todowrite: false,
-        todoread: false,
-        websearch: false,
-      },
-    },
-  },
-});
+    };
+  });
 
 const onStartLoadConfig = Effect.gen(function* () {
-  const configPath = expandHome(path.join(CONFIG_DIRECTORY, CONFIG_FILENAME));
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
 
-  const configFile = Bun.file(configPath);
+  const configDir = yield* expandHome(CONFIG_DIRECTORY);
+  const configPath = path.join(configDir, CONFIG_FILENAME);
 
-  const exists = yield* Effect.promise(() => configFile.exists());
+  const exists = yield* fs.exists(configPath);
 
   if (!exists) {
     yield* Effect.log(
       `Config file not found at ${configPath}, creating default config...`
     );
-    yield* Effect.tryPromise({
-      try: () => Bun.write(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2)),
-      catch: (error) =>
-        new ConfigError({
-          message: "Failed to create default config",
-          cause: error,
-        }),
-    });
+    // Ensure directory exists
+    yield* fs.makeDirectory(configDir, { recursive: true }).pipe(
+      Effect.catchAll(() => Effect.void)
+    );
+    yield* fs.writeFileString(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2)).pipe(
+      Effect.catchAll((error) =>
+        Effect.fail(
+          new ConfigError({
+            message: "Failed to create default config",
+            cause: error,
+          })
+        )
+      )
+    );
     yield* Effect.log(`Default config created at ${configPath}`);
+    const promptsDir = yield* expandHome(DEFAULT_CONFIG.promptsDirectory);
+    const reposDir = yield* expandHome(DEFAULT_CONFIG.reposDirectory);
     return {
       ...DEFAULT_CONFIG,
-      promptsDirectory: expandHome(DEFAULT_CONFIG.promptsDirectory),
-      reposDirectory: expandHome(DEFAULT_CONFIG.reposDirectory),
+      promptsDirectory: promptsDir,
+      reposDirectory: reposDir,
     } satisfies Config;
   } else {
-    return yield* Effect.tryPromise({
-      try: () => configFile.json(),
-      catch: (error) =>
-        new ConfigError({
-          message: "Failed to load config",
-          cause: error,
-        }),
-    }).pipe(
+    const content = yield* fs.readFileString(configPath).pipe(
+      Effect.catchAll((error) =>
+        Effect.fail(
+          new ConfigError({
+            message: "Failed to load config",
+            cause: error,
+          })
+        )
+      )
+    );
+    const parsed = JSON.parse(content);
+    return yield* Effect.succeed(parsed).pipe(
       Effect.flatMap(Schema.decode(configSchema)),
-      Effect.map((loadedConfig) => {
-        return {
-          ...loadedConfig,
-          promptsDirectory: expandHome(loadedConfig.promptsDirectory),
-          reposDirectory: expandHome(loadedConfig.reposDirectory),
-        } satisfies Config;
-      })
+      Effect.flatMap((loadedConfig) =>
+        Effect.gen(function* () {
+          const promptsDir = yield* expandHome(loadedConfig.promptsDirectory);
+          const reposDir = yield* expandHome(loadedConfig.reposDirectory);
+          return {
+            ...loadedConfig,
+            promptsDirectory: promptsDir,
+            reposDirectory: reposDir,
+          } satisfies Config;
+        })
+      )
     );
   }
 });
 
 const configService = Effect.gen(function* () {
+  const path = yield* Path.Path;
   const config = yield* onStartLoadConfig;
 
   const getRepo = ({
@@ -195,10 +216,7 @@ const configService = Effect.gen(function* () {
         return repo;
       }),
     getOpenCodeConfig: (args: { repoName: string }) =>
-      Effect.gen(function* () {
-        const { repoName } = args;
-        return OPENCODE_CONFIG({ repoName, config });
-      }),
+      OPENCODE_CONFIG({ repoName: args.repoName, reposDirectory: config.reposDirectory }),
     rawConfig: () => Effect.succeed(config),
   };
 });

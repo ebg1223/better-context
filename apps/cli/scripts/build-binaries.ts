@@ -1,5 +1,7 @@
 import { $ } from "bun";
-import { mkdir } from "node:fs/promises";
+import { FileSystem } from "@effect/platform";
+import { BunContext, BunRuntime } from "@effect/platform-bun";
+import { Effect } from "effect";
 import packageJson from "../package.json";
 
 const VERSION = packageJson.version;
@@ -18,12 +20,20 @@ const outputNames: Record<(typeof targets)[number], string> = {
   "bun-linux-arm64": "btca-linux-arm64",
 };
 
-await mkdir("dist", { recursive: true });
+const main = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
 
-for (const target of targets) {
-  const outfile = `dist/${outputNames[target]}`;
-  console.log(`Building ${target} -> ${outfile} (v${VERSION})`);
-  await $`bun build src/index.ts --compile --target=${target} --outfile=${outfile} --define __VERSION__='"${VERSION}"'`;
-}
+  yield* fs.makeDirectory("dist", { recursive: true });
 
-console.log("Done building all targets");
+  for (const target of targets) {
+    const outfile = `dist/${outputNames[target]}`;
+    console.log(`Building ${target} -> ${outfile} (v${VERSION})`);
+    yield* Effect.promise(
+      () => $`bun build src/index.ts --compile --target=${target} --outfile=${outfile} --define __VERSION__='"${VERSION}"'`
+    );
+  }
+
+  console.log("Done building all targets");
+});
+
+main.pipe(Effect.provide(BunContext.layer), BunRuntime.runMain);

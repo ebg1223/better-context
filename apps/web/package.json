@@ -28,5 +28,8 @@
 		"typescript": "^5.9.3",
 		"vite": "^7.2.2",
 		"vite-plugin-devtools-json": "^1.0.0"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^0.560.0"
 	}
 }
