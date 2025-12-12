@@ -24,17 +24,14 @@ btca`;
 		}
 	] as const;
 
-	const AGENTS_MD_SNIPPET = `## btca (Better Context)
+	const AGENTS_MD_SNIPPET = `## btca
 
-When you need up-to-date, accurate info about a third-party library/framework, use btca to search the source code/docs instead of guessing. Don't always use it, only when you are really not sure about something, or if the user says "use btca".
+Trigger: user says "use btca" (for codebase/docs questions).
 
-- Ask: btca ask -t <tech> -q "<question>"
+Run:
+- btca ask -t <tech> -q "<question>"
 
-You currently have access to the following technologies:
-
-- svelte
-- tailwindcss
-`;
+Available <tech>: svelte, tailwindcss`;
 
 	const ASK_CMD = `btca ask -t svelte -q "How do stores work in Svelte 5?"`;
 	const CHAT_CMD = `btca chat -t svelte`;
