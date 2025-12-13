@@ -1,347 +1,311 @@
-import { Command, Options } from "@effect/cli";
-import {
-  HttpRouter,
-  HttpServer,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "@effect/platform";
-import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, Layer, Schema, Stream } from "effect";
-import { OcService, type OcEvent } from "./oc.ts";
-import { ConfigService } from "./config.ts";
+import { Command, Options } from '@effect/cli';
+import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from '@effect/platform';
+import { BunHttpServer } from '@effect/platform-bun';
+import { Effect, Layer, Schema, Stream } from 'effect';
+import { OcService, type OcEvent } from './oc.ts';
+import { ConfigService } from './config.ts';
 
 declare const __VERSION__: string;
-const VERSION: string =
-  typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0-dev";
+const VERSION: string = typeof __VERSION__ !== 'undefined' ? __VERSION__ : '0.0.0-dev';
 
 const programLayer = Layer.mergeAll(OcService.Default, ConfigService.Default);
 
 // === Ask Subcommand ===
-const questionOption = Options.text("question").pipe(Options.withAlias("q"));
-const techOption = Options.text("tech").pipe(Options.withAlias("t"));
+const questionOption = Options.text('question').pipe(Options.withAlias('q'));
+const techOption = Options.text('tech').pipe(Options.withAlias('t'));
 
 const askCommand = Command.make(
-  "ask",
-  { question: questionOption, tech: techOption },
-  ({ question, tech }) =>
-    Effect.gen(function* () {
-      const oc = yield* OcService;
-      const eventStream = yield* oc.askQuestion({ tech, question });
+	'ask',
+	{ question: questionOption, tech: techOption },
+	({ question, tech }) =>
+		Effect.gen(function* () {
+			const oc = yield* OcService;
+			const eventStream = yield* oc.askQuestion({ tech, question });
 
-      let currentMessageId: string | null = null;
+			let currentMessageId: string | null = null;
 
-      yield* eventStream.pipe(
-        Stream.runForEach((event) =>
-          Effect.sync(() => {
-            switch (event.type) {
-              case "message.part.updated":
-                if (event.properties.part.type === "text") {
-                  if (currentMessageId === event.properties.part.messageID) {
-                    process.stdout.write(event.properties.delta ?? "");
-                  } else {
-                    currentMessageId = event.properties.part.messageID;
-                    process.stdout.write("\n\n" + event.properties.part.text);
-                  }
-                }
-                break;
-              default:
-                break;
-            }
-          })
-        )
-      );
+			yield* eventStream.pipe(
+				Stream.runForEach((event) =>
+					Effect.sync(() => {
+						switch (event.type) {
+							case 'message.part.updated':
+								if (event.properties.part.type === 'text') {
+									if (currentMessageId === event.properties.part.messageID) {
+										process.stdout.write(event.properties.delta ?? '');
+									} else {
+										currentMessageId = event.properties.part.messageID;
+										process.stdout.write('\n\n' + event.properties.part.text);
+									}
+								}
+								break;
+							default:
+								break;
+						}
+					})
+				)
+			);
 
-      console.log("\n");
-    }).pipe(
-      Effect.catchTags({
-        InvalidProviderError: (e) =>
-          Effect.sync(() => {
-            console.error(`Error: Unknown provider "${e.providerId}"`);
-            console.error(
-              `Available providers: ${e.availableProviders.join(", ")}`
-            );
-            process.exit(1);
-          }),
-        InvalidModelError: (e) =>
-          Effect.sync(() => {
-            console.error(
-              `Error: Unknown model "${e.modelId}" for provider "${e.providerId}"`
-            );
-            console.error(`Available models: ${e.availableModels.join(", ")}`);
-            process.exit(1);
-          }),
-        ProviderNotConnectedError: (e) =>
-          Effect.sync(() => {
-            console.error(`Error: Provider "${e.providerId}" is not connected`);
-            console.error(
-              `Connected providers: ${e.connectedProviders.join(", ")}`
-            );
-            console.error(
-              `Run "opencode auth" to configure provider credentials.`
-            );
-            process.exit(1);
-          }),
-      }),
-      Effect.provide(programLayer)
-    )
+			console.log('\n');
+		}).pipe(
+			Effect.catchTags({
+				InvalidProviderError: (e) =>
+					Effect.sync(() => {
+						console.error(`Error: Unknown provider "${e.providerId}"`);
+						console.error(`Available providers: ${e.availableProviders.join(', ')}`);
+						process.exit(1);
+					}),
+				InvalidModelError: (e) =>
+					Effect.sync(() => {
+						console.error(`Error: Unknown model "${e.modelId}" for provider "${e.providerId}"`);
+						console.error(`Available models: ${e.availableModels.join(', ')}`);
+						process.exit(1);
+					}),
+				ProviderNotConnectedError: (e) =>
+					Effect.sync(() => {
+						console.error(`Error: Provider "${e.providerId}" is not connected`);
+						console.error(`Connected providers: ${e.connectedProviders.join(', ')}`);
+						console.error(`Run "opencode auth" to configure provider credentials.`);
+						process.exit(1);
+					})
+			}),
+			Effect.provide(programLayer)
+		)
 );
 
 // === Open Subcommand ===
-const openCommand = Command.make("open", {}, () =>
-  Effect.gen(function* () {
-    const oc = yield* OcService;
-    yield* oc.holdOpenInstanceInBg();
-  }).pipe(Effect.provide(programLayer))
+const openCommand = Command.make('open', {}, () =>
+	Effect.gen(function* () {
+		const oc = yield* OcService;
+		yield* oc.holdOpenInstanceInBg();
+	}).pipe(Effect.provide(programLayer))
 );
 
 // === Chat Subcommand ===
-const chatTechOption = Options.text("tech").pipe(Options.withAlias("t"));
+const chatTechOption = Options.text('tech').pipe(Options.withAlias('t'));
 
-const chatCommand = Command.make("chat", { tech: chatTechOption }, ({ tech }) =>
-  Effect.gen(function* () {
-    const oc = yield* OcService;
-    yield* oc.spawnTui({ tech });
-  }).pipe(Effect.provide(programLayer))
+const chatCommand = Command.make('chat', { tech: chatTechOption }, ({ tech }) =>
+	Effect.gen(function* () {
+		const oc = yield* OcService;
+		yield* oc.spawnTui({ tech });
+	}).pipe(Effect.provide(programLayer))
 );
 
 // === Serve Subcommand ===
 const QuestionRequest = Schema.Struct({
-  tech: Schema.String,
-  question: Schema.String,
+	tech: Schema.String,
+	question: Schema.String
 });
 
-const portOption = Options.integer("port").pipe(
-  Options.withAlias("p"),
-  Options.withDefault(8080)
-);
+const portOption = Options.integer('port').pipe(Options.withAlias('p'), Options.withDefault(8080));
 
-const serveCommand = Command.make("serve", { port: portOption }, ({ port }) =>
-  Effect.gen(function* () {
-    const router = HttpRouter.empty.pipe(
-      HttpRouter.post(
-        "/question",
-        Effect.gen(function* () {
-          const body = yield* HttpServerRequest.schemaBodyJson(QuestionRequest);
-          const oc = yield* OcService;
+const serveCommand = Command.make('serve', { port: portOption }, ({ port }) =>
+	Effect.gen(function* () {
+		const router = HttpRouter.empty.pipe(
+			HttpRouter.post(
+				'/question',
+				Effect.gen(function* () {
+					const body = yield* HttpServerRequest.schemaBodyJson(QuestionRequest);
+					const oc = yield* OcService;
 
-          const eventStream = yield* oc.askQuestion({
-            tech: body.tech,
-            question: body.question,
-          });
+					const eventStream = yield* oc.askQuestion({
+						tech: body.tech,
+						question: body.question
+					});
 
-          const chunks: string[] = [];
-          let currentMessageId: string | null = null;
-          yield* eventStream.pipe(
-            Stream.runForEach((event) =>
-              Effect.sync(() => {
-                switch (event.type) {
-                  case "message.part.updated":
-                    if (event.properties.part.type === "text") {
-                      if (
-                        currentMessageId === event.properties.part.messageID
-                      ) {
-                        chunks[chunks.length - 1] +=
-                          event.properties.delta ?? "";
-                      } else {
-                        currentMessageId = event.properties.part.messageID;
-                        chunks.push(event.properties.part.text ?? "");
-                      }
-                    }
-                    break;
-                  default:
-                    break;
-                }
-              })
-            )
-          );
+					const chunks: string[] = [];
+					let currentMessageId: string | null = null;
+					yield* eventStream.pipe(
+						Stream.runForEach((event) =>
+							Effect.sync(() => {
+								switch (event.type) {
+									case 'message.part.updated':
+										if (event.properties.part.type === 'text') {
+											if (currentMessageId === event.properties.part.messageID) {
+												chunks[chunks.length - 1] += event.properties.delta ?? '';
+											} else {
+												currentMessageId = event.properties.part.messageID;
+												chunks.push(event.properties.part.text ?? '');
+											}
+										}
+										break;
+									default:
+										break;
+								}
+							})
+						)
+					);
 
-          return yield* HttpServerResponse.json({ answer: chunks.join("") });
-        })
-      )
-    );
+					return yield* HttpServerResponse.json({ answer: chunks.join('') });
+				})
+			)
+		);
 
-    const ServerLive = BunHttpServer.layer({ port });
+		const ServerLive = BunHttpServer.layer({ port });
 
-    const HttpLive = router.pipe(
-      HttpServer.serve(),
-      HttpServer.withLogAddress,
-      Layer.provide(ServerLive)
-    );
+		const HttpLive = router.pipe(
+			HttpServer.serve(),
+			HttpServer.withLogAddress,
+			Layer.provide(ServerLive)
+		);
 
-    return yield* Layer.launch(HttpLive);
-  }).pipe(Effect.scoped, Effect.provide(programLayer))
+		return yield* Layer.launch(HttpLive);
+	}).pipe(Effect.scoped, Effect.provide(programLayer))
 );
 
 // === Config Subcommands ===
 
 // config model - view or set model/provider
-const providerOption = Options.text("provider").pipe(
-  Options.withAlias("p"),
-  Options.optional
-);
-const modelOption = Options.text("model").pipe(
-  Options.withAlias("m"),
-  Options.optional
-);
+const providerOption = Options.text('provider').pipe(Options.withAlias('p'), Options.optional);
+const modelOption = Options.text('model').pipe(Options.withAlias('m'), Options.optional);
 
 const configModelCommand = Command.make(
-  "model",
-  { provider: providerOption, model: modelOption },
-  ({ provider, model }) =>
-    Effect.gen(function* () {
-      const config = yield* ConfigService;
+	'model',
+	{ provider: providerOption, model: modelOption },
+	({ provider, model }) =>
+		Effect.gen(function* () {
+			const config = yield* ConfigService;
 
-      // If both options provided, update the config
-      if (provider._tag === "Some" && model._tag === "Some") {
-        const result = yield* config.updateModel({
-          provider: provider.value,
-          model: model.value,
-        });
-        console.log(`Updated model configuration:`);
-        console.log(`  Provider: ${result.provider}`);
-        console.log(`  Model: ${result.model}`);
-      } else if (provider._tag === "Some" || model._tag === "Some") {
-        // If only one is provided, show an error
-        console.error(
-          "Error: Both --provider and --model must be specified together"
-        );
-        process.exit(1);
-      } else {
-        // No options, show current values
-        const current = yield* config.getModel();
-        console.log(`Current model configuration:`);
-        console.log(`  Provider: ${current.provider}`);
-        console.log(`  Model: ${current.model}`);
-      }
-    }).pipe(Effect.provide(programLayer))
+			// If both options provided, update the config
+			if (provider._tag === 'Some' && model._tag === 'Some') {
+				const result = yield* config.updateModel({
+					provider: provider.value,
+					model: model.value
+				});
+				console.log(`Updated model configuration:`);
+				console.log(`  Provider: ${result.provider}`);
+				console.log(`  Model: ${result.model}`);
+			} else if (provider._tag === 'Some' || model._tag === 'Some') {
+				// If only one is provided, show an error
+				console.error('Error: Both --provider and --model must be specified together');
+				process.exit(1);
+			} else {
+				// No options, show current values
+				const current = yield* config.getModel();
+				console.log(`Current model configuration:`);
+				console.log(`  Provider: ${current.provider}`);
+				console.log(`  Model: ${current.model}`);
+			}
+		}).pipe(Effect.provide(programLayer))
 );
 
 // config repos list - list all repos
-const configReposListCommand = Command.make("list", {}, () =>
-  Effect.gen(function* () {
-    const config = yield* ConfigService;
-    const repos = yield* config.getRepos();
+const configReposListCommand = Command.make('list', {}, () =>
+	Effect.gen(function* () {
+		const config = yield* ConfigService;
+		const repos = yield* config.getRepos();
 
-    if (repos.length === 0) {
-      console.log("No repos configured.");
-      return;
-    }
+		if (repos.length === 0) {
+			console.log('No repos configured.');
+			return;
+		}
 
-    console.log("Configured repos:\n");
-    for (const repo of repos) {
-      console.log(`  ${repo.name}`);
-      console.log(`    URL: ${repo.url}`);
-      console.log(`    Branch: ${repo.branch}`);
-      if (repo.specialNotes) {
-        console.log(`    Notes: ${repo.specialNotes}`);
-      }
-      console.log();
-    }
-  }).pipe(Effect.provide(programLayer))
+		console.log('Configured repos:\n');
+		for (const repo of repos) {
+			console.log(`  ${repo.name}`);
+			console.log(`    URL: ${repo.url}`);
+			console.log(`    Branch: ${repo.branch}`);
+			if (repo.specialNotes) {
+				console.log(`    Notes: ${repo.specialNotes}`);
+			}
+			console.log();
+		}
+	}).pipe(Effect.provide(programLayer))
 );
 
 // config repos add - add a new repo
-const repoNameOption = Options.text("name").pipe(Options.withAlias("n"));
-const repoUrlOption = Options.text("url").pipe(Options.withAlias("u"));
-const repoBranchOption = Options.text("branch").pipe(
-  Options.withAlias("b"),
-  Options.withDefault("main")
+const repoNameOption = Options.text('name').pipe(Options.withAlias('n'));
+const repoUrlOption = Options.text('url').pipe(Options.withAlias('u'));
+const repoBranchOption = Options.text('branch').pipe(
+	Options.withAlias('b'),
+	Options.withDefault('main')
 );
-const repoNotesOption = Options.text("notes").pipe(Options.optional);
+const repoNotesOption = Options.text('notes').pipe(Options.optional);
 
 const configReposAddCommand = Command.make(
-  "add",
-  {
-    name: repoNameOption,
-    url: repoUrlOption,
-    branch: repoBranchOption,
-    notes: repoNotesOption,
-  },
-  ({ name, url, branch, notes }) =>
-    Effect.gen(function* () {
-      const config = yield* ConfigService;
+	'add',
+	{
+		name: repoNameOption,
+		url: repoUrlOption,
+		branch: repoBranchOption,
+		notes: repoNotesOption
+	},
+	({ name, url, branch, notes }) =>
+		Effect.gen(function* () {
+			const config = yield* ConfigService;
 
-      const repo = {
-        name,
-        url,
-        branch,
-        ...(notes._tag === "Some" ? { specialNotes: notes.value } : {}),
-      };
+			const repo = {
+				name,
+				url,
+				branch,
+				...(notes._tag === 'Some' ? { specialNotes: notes.value } : {})
+			};
 
-      yield* config.addRepo(repo);
-      console.log(`Added repo "${name}":`);
-      console.log(`  URL: ${url}`);
-      console.log(`  Branch: ${branch}`);
-      if (notes._tag === "Some") {
-        console.log(`  Notes: ${notes.value}`);
-      }
-    }).pipe(
-      Effect.catchTag("ConfigError", (e) =>
-        Effect.sync(() => {
-          console.error(`Error: ${e.message}`);
-          process.exit(1);
-        })
-      ),
-      Effect.provide(programLayer)
-    )
+			yield* config.addRepo(repo);
+			console.log(`Added repo "${name}":`);
+			console.log(`  URL: ${url}`);
+			console.log(`  Branch: ${branch}`);
+			if (notes._tag === 'Some') {
+				console.log(`  Notes: ${notes.value}`);
+			}
+		}).pipe(
+			Effect.catchTag('ConfigError', (e) =>
+				Effect.sync(() => {
+					console.error(`Error: ${e.message}`);
+					process.exit(1);
+				})
+			),
+			Effect.provide(programLayer)
+		)
 );
 
 // config repos - parent command for repo subcommands
-const configReposCommand = Command.make("repos", {}, () =>
-  Effect.sync(() => {
-    console.log("Usage: btca config repos <command>");
-    console.log("");
-    console.log("Commands:");
-    console.log("  list    List all configured repos");
-    console.log("  add     Add a new repo");
-  })
-).pipe(
-  Command.withSubcommands([configReposListCommand, configReposAddCommand])
-);
+const configReposCommand = Command.make('repos', {}, () =>
+	Effect.sync(() => {
+		console.log('Usage: btca config repos <command>');
+		console.log('');
+		console.log('Commands:');
+		console.log('  list    List all configured repos');
+		console.log('  add     Add a new repo');
+	})
+).pipe(Command.withSubcommands([configReposListCommand, configReposAddCommand]));
 
 // config - parent command
-const configCommand = Command.make("config", {}, () =>
-  Effect.gen(function* () {
-    const config = yield* ConfigService;
-    const configPath = yield* config.getConfigPath();
+const configCommand = Command.make('config', {}, () =>
+	Effect.gen(function* () {
+		const config = yield* ConfigService;
+		const configPath = yield* config.getConfigPath();
 
-    console.log(`Config file: ${configPath}`);
-    console.log("");
-    console.log("Usage: btca config <command>");
-    console.log("");
-    console.log("Commands:");
-    console.log("  model   View or set the model and provider");
-    console.log("  repos   Manage configured repos");
-  }).pipe(Effect.provide(programLayer))
+		console.log(`Config file: ${configPath}`);
+		console.log('');
+		console.log('Usage: btca config <command>');
+		console.log('');
+		console.log('Commands:');
+		console.log('  model   View or set the model and provider');
+		console.log('  repos   Manage configured repos');
+	}).pipe(Effect.provide(programLayer))
 ).pipe(Command.withSubcommands([configModelCommand, configReposCommand]));
 
 // === Main Command ===
-const mainCommand = Command.make("btca", {}, () =>
-  Effect.sync(() => {
-    console.log(`btca v${VERSION}. run btca --help for more information.`);
-  })
+const mainCommand = Command.make('btca', {}, () =>
+	Effect.sync(() => {
+		console.log(`btca v${VERSION}. run btca --help for more information.`);
+	})
 ).pipe(
-  Command.withSubcommands([
-    askCommand,
-    serveCommand,
-    openCommand,
-    chatCommand,
-    configCommand,
-  ])
+	Command.withSubcommands([askCommand, serveCommand, openCommand, chatCommand, configCommand])
 );
 
 const cliService = Effect.gen(function* () {
-  return {
-    run: (argv: string[]) =>
-      Command.run(mainCommand, {
-        name: "btca",
-        version: VERSION,
-      })(argv),
-  };
+	return {
+		run: (argv: string[]) =>
+			Command.run(mainCommand, {
+				name: 'btca',
+				version: VERSION
+			})(argv)
+	};
 });
 
-export class CliService extends Effect.Service<CliService>()("CliService", {
-  effect: cliService,
+export class CliService extends Effect.Service<CliService>()('CliService', {
+	effect: cliService
 }) {}
 
 export { type OcEvent };
