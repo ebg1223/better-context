@@ -79,6 +79,12 @@
 				</a>
 				<a
 					class="hidden rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-900 no-underline shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-50 dark:hover:bg-neutral-900 sm:inline-flex"
+					href="/commands"
+				>
+					Commands
+				</a>
+				<a
+					class="hidden rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-900 no-underline shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-50 dark:hover:bg-neutral-900 sm:inline-flex"
 					href="https://github.com/bmdavis419/better-context"
 					target="_blank"
 					rel="noreferrer"

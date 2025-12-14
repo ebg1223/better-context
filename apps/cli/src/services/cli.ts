@@ -1,7 +1,8 @@
 import { Command, Options } from '@effect/cli';
-import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from '@effect/platform';
+import { FileSystem, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from '@effect/platform';
 import { BunHttpServer } from '@effect/platform-bun';
 import { Effect, Layer, Schema, Stream } from 'effect';
+import * as readline from 'readline';
 import { OcService, type OcEvent } from './oc.ts';
 import { ConfigService } from './config.ts';
 
@@ -258,6 +259,74 @@ const configReposAddCommand = Command.make(
 		)
 );
 
+// config repos clear - clear all downloaded repos
+const askConfirmation = (question: string): Effect.Effect<boolean> =>
+	Effect.async<boolean>((resume) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout
+		});
+
+		rl.question(question, (answer) => {
+			rl.close();
+			const normalized = answer.toLowerCase().trim();
+			resume(Effect.succeed(normalized === 'y' || normalized === 'yes'));
+		});
+	});
+
+const configReposClearCommand = Command.make('clear', {}, () =>
+	Effect.gen(function* () {
+		const config = yield* ConfigService;
+		const fs = yield* FileSystem.FileSystem;
+
+		const reposDir = yield* config.getReposDirectory();
+
+		// Check if repos directory exists
+		const exists = yield* fs.exists(reposDir);
+		if (!exists) {
+			console.log('Repos directory does not exist. Nothing to clear.');
+			return;
+		}
+
+		// List all directories in the repos directory
+		const entries = yield* fs.readDirectory(reposDir);
+		const repoPaths: string[] = [];
+
+		for (const entry of entries) {
+			const fullPath = `${reposDir}/${entry}`;
+			const stat = yield* fs.stat(fullPath);
+			if (stat.type === 'Directory') {
+				repoPaths.push(fullPath);
+			}
+		}
+
+		if (repoPaths.length === 0) {
+			console.log('No repos found in the repos directory. Nothing to clear.');
+			return;
+		}
+
+		console.log('The following repos will be deleted:\n');
+		for (const repoPath of repoPaths) {
+			console.log(`  ${repoPath}`);
+		}
+		console.log();
+
+		const confirmed = yield* askConfirmation('Are you sure you want to delete these repos? (y/N): ');
+
+		if (!confirmed) {
+			console.log('Aborted.');
+			return;
+		}
+
+		for (const repoPath of repoPaths) {
+			yield* fs.remove(repoPath, { recursive: true });
+			console.log(`Deleted: ${repoPath}`);
+		}
+
+		console.log('\nAll repos have been cleared.');
+	}).pipe(Effect.provide(programLayer))
+);
+
 // config repos - parent command for repo subcommands
 const configReposCommand = Command.make('repos', {}, () =>
 	Effect.sync(() => {
@@ -266,8 +335,9 @@ const configReposCommand = Command.make('repos', {}, () =>
 		console.log('Commands:');
 		console.log('  list    List all configured repos');
 		console.log('  add     Add a new repo');
+		console.log('  clear   Clear all downloaded repos');
 	})
-).pipe(Command.withSubcommands([configReposListCommand, configReposAddCommand]));
+).pipe(Command.withSubcommands([configReposListCommand, configReposAddCommand, configReposClearCommand]));
 
 // config - parent command
 const configCommand = Command.make('config', {}, () =>

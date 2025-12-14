@@ -279,7 +279,8 @@ const configService = Effect.gen(function* () {
 				config = { ...config, repos: [...config.repos, repo] };
 				yield* writeConfig(config);
 				return repo;
-			})
+			}),
+		getReposDirectory: () => Effect.succeed(config.reposDirectory)
 	};
 });
 
