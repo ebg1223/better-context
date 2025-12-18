@@ -31,7 +31,8 @@
 		<p
 			class="max-w-2xl text-pretty text-base leading-relaxed text-neutral-700 dark:text-neutral-300 sm:text-lg"
 		>
-		Any model that works with OpenCode works with btca. Under the hood btca uses the OpenCode SDK, which will read your local config.
+			Any model that works with OpenCode works with btca. Under the hood btca uses the OpenCode SDK,
+			which will read your local config.
 		</p>
 	</div>
 

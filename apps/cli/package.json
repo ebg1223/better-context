@@ -1,7 +1,7 @@
 {
 	"name": "btca",
 	"author": "Ben Davis",
-	"version": "0.4.3",
+	"version": "0.5.0",
 	"description": "CLI tool for asking questions about technologies using OpenCode",
 	"type": "module",
 	"license": "MIT",
@@ -37,6 +37,7 @@
 		"prepare": "effect-language-service patch"
 	},
 	"devDependencies": {
+		"@btca/shared": "workspace:*",
 		"@effect/cli": "^0.72.1",
 		"@effect/language-service": "^0.62.1",
 		"@effect/platform": "^0.93.5",
@@ -45,15 +46,12 @@
 		"@effect/printer-ansi": "^0.47.0",
 		"@effect/typeclass": "^0.38.0",
 		"@opencode-ai/sdk": "^1.0.119",
+		"@opentui/core": "^0.1.60",
+		"@opentui/react": "^0.1.60",
 		"@types/bun": "latest",
 		"@types/react": "^19.2.7",
 		"effect": "^3.19.8",
+		"react": "^19.2.3",
 		"typescript": "^5.9.3"
-	},
-	"dependencies": {
-		"@btca/shared": "workspace:*",
-		"@opentui/core": "^0.1.60",
-		"@opentui/react": "^0.1.60",
-		"react": "^19.2.3"
 	}
 }
