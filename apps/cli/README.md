@@ -119,8 +119,8 @@ btca config repos list
 Add a new repository to the configuration.
 
 ```bash
-btca config repos add -n <name> -u <url> [-b <branch>] [--notes <notes>]
-btca config repos add --name react --url https://github.com/facebook/react --branch main
+btca config repos add -n <name> -u <url> [-b <branch>] [--notes <notes>] [--sync]
+btca config repos add --name react --url https://github.com/facebook/react --branch main --sync
 ```
 
 Options:
@@ -129,6 +129,54 @@ Options:
 - `-u, --url` - Git repository URL (required)
 - `-b, --branch` - Branch to use (default: "main")
 - `--notes` - Special instructions for the AI when using this repo
+- `--sync` - Sync to OpenCode after adding the repo
+
+#### `btca config repos remove`
+
+Remove a repository from the configuration.
+
+```bash
+btca config repos remove -n <name>
+```
+
+Options:
+
+- `-n, --name` - Name of the repo to remove
+
+#### `btca config repos clear`
+
+Clear all downloaded repositories from disk.
+
+```bash
+btca config repos clear
+```
+
+### `btca sync`
+
+Sync btca to OpenCode by generating a tool and agent in `~/.config/opencode/`.
+
+```bash
+btca sync
+```
+
+This creates:
+
+- `~/.config/opencode/tool/btca.ts` - A tool OpenCode can use to query btca
+- `~/.config/opencode/agent/btca-docs.md` - A subagent specialized for library questions
+
+After syncing, you can use `@btca-docs` in OpenCode or the LLM will automatically use the btca tool when asking about configured libraries.
+
+Re-run `btca sync` after adding or removing repos to update the generated files.
+
+### `btca unsync`
+
+Remove btca integration from OpenCode.
+
+```bash
+btca unsync
+```
+
+This removes the generated tool and agent files from `~/.config/opencode/`.
 
 ## Configuration
 
