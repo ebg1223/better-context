@@ -11,11 +11,12 @@ import { Effect, Layer, Schema, Stream } from 'effect';
 import * as readline from 'readline';
 import { OcService, type OcEvent } from './oc.ts';
 import { ConfigService } from './config.ts';
+import { SyncService } from './sync.ts';
 
 declare const __VERSION__: string;
 const VERSION: string = typeof __VERSION__ !== 'undefined' ? __VERSION__ : '0.0.0-dev';
 
-const programLayer = Layer.mergeAll(OcService.Default, ConfigService.Default);
+const programLayer = Layer.mergeAll(OcService.Default, ConfigService.Default, SyncService.Default);
 
 // === Ask Subcommand ===
 const questionOption = Options.text('question').pipe(Options.withAlias('q'));
@@ -228,6 +229,7 @@ const repoBranchOption = Options.text('branch').pipe(
 	Options.withDefault('main')
 );
 const repoNotesOption = Options.text('notes').pipe(Options.optional);
+const syncAfterAddOption = Options.boolean('sync').pipe(Options.withDefault(false));
 
 const configReposAddCommand = Command.make(
 	'add',
@@ -235,9 +237,10 @@ const configReposAddCommand = Command.make(
 		name: repoNameOption.pipe(Options.optional),
 		url: repoUrlOption.pipe(Options.optional),
 		branch: repoBranchOption,
-		notes: repoNotesOption
+		notes: repoNotesOption,
+		sync: syncAfterAddOption
 	},
-	({ name, url, branch, notes }) =>
+	({ name, url, branch, notes, sync }) =>
 		Effect.gen(function* () {
 			const config = yield* ConfigService;
 
@@ -279,13 +282,27 @@ const configReposAddCommand = Command.make(
 			if (notes._tag === 'Some') {
 				console.log(`  Notes: ${notes.value}`);
 			}
+
+			if (sync) {
+				const syncService = yield* SyncService;
+				const result = yield* syncService.sync();
+				console.log('Synced to OpenCode:');
+				console.log(`  Tool:  ${result.toolPath}`);
+				console.log(`  Agent: ${result.agentPath}`);
+			}
 		}).pipe(
-			Effect.catchTag('ConfigError', (e) =>
-				Effect.sync(() => {
-					console.error(`Error: ${e.message}`);
-					process.exit(1);
-				})
-			),
+			Effect.catchTags({
+				ConfigError: (e) =>
+					Effect.sync(() => {
+						console.error(`Error: ${e.message}`);
+						process.exit(1);
+					}),
+				SyncError: (e) =>
+					Effect.sync(() => {
+						console.error(`Error: ${e.message}`);
+						process.exit(1);
+					})
+			}),
 			Effect.provide(programLayer)
 		)
 );
@@ -458,13 +475,75 @@ const configCommand = Command.make('config', {}, () =>
 	}).pipe(Effect.provide(programLayer))
 ).pipe(Command.withSubcommands([configModelCommand, configReposCommand]));
 
+// === Sync Command ===
+const syncCommand = Command.make('sync', {}, () =>
+	Effect.gen(function* () {
+		const sync = yield* SyncService;
+		const result = yield* sync.sync();
+		console.log('Synced btca to OpenCode:');
+		console.log(`  Tool:  ${result.toolPath}`);
+		console.log(`  Agent: ${result.agentPath}`);
+	}).pipe(
+		Effect.catchTag('SyncError', (e) =>
+			Effect.sync(() => {
+				console.error(`Error: ${e.message}`);
+				process.exit(1);
+			})
+		),
+		Effect.provide(programLayer)
+	)
+);
+
+// === Unsync Command ===
+const unsyncCommand = Command.make('unsync', {}, () =>
+	Effect.gen(function* () {
+		const sync = yield* SyncService;
+
+		const isSynced = yield* sync.isSynced();
+		if (!isSynced) {
+			console.log('Nothing to unsync. btca is not synced to OpenCode.');
+			return;
+		}
+
+		const confirmed = yield* askConfirmation('Remove btca integration from OpenCode? (y/N): ');
+		if (!confirmed) {
+			console.log('Aborted.');
+			return;
+		}
+
+		const result = yield* sync.unsync();
+		if (result.removed.length > 0) {
+			console.log('Removed btca from OpenCode:');
+			for (const path of result.removed) {
+				console.log(`  ${path}`);
+			}
+		}
+	}).pipe(
+		Effect.catchTag('SyncError', (e) =>
+			Effect.sync(() => {
+				console.error(`Error: ${e.message}`);
+				process.exit(1);
+			})
+		),
+		Effect.provide(programLayer)
+	)
+);
+
 // === Main Command ===
 const mainCommand = Command.make('btca', {}, () =>
 	Effect.sync(() => {
 		console.log(`btca v${VERSION}. run btca --help for more information.`);
 	})
 ).pipe(
-	Command.withSubcommands([askCommand, serveCommand, openCommand, chatCommand, configCommand])
+	Command.withSubcommands([
+		askCommand,
+		serveCommand,
+		openCommand,
+		chatCommand,
+		configCommand,
+		syncCommand,
+		unsyncCommand
+	])
 );
 
 const cliService = Effect.gen(function* () {
