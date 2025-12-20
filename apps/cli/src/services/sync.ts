@@ -2,7 +2,7 @@ import { FileSystem, Path } from '@effect/platform';
 import { Effect } from 'effect';
 import { ConfigService } from './config.ts';
 import { SyncError } from '../lib/errors.ts';
-import { generateToolContent, generateAgentContent } from '../lib/templates.ts';
+import { generateToolContent, generateAgentContent, type RepoInfo } from '../lib/templates.ts';
 import { expandHome } from '../lib/utils/files.ts';
 
 const OPENCODE_CONFIG_DIR = '~/.config/opencode';
@@ -45,7 +45,12 @@ const syncService = Effect.gen(function* () {
 					);
 				}
 
-				const repoNames = repos.map((r) => r.name);
+				// Extract repo info for templates
+				const repoInfos: RepoInfo[] = repos.map((r) => ({
+					name: r.name,
+					url: r.url,
+					specialNotes: r.specialNotes
+				}));
 
 				// Ensure directories exist
 				const toolDir = yield* expandHome(TOOL_DIR);
@@ -57,8 +62,8 @@ const syncService = Effect.gen(function* () {
 				const toolPath = yield* getToolPath();
 				const agentPath = yield* getAgentPath();
 
-				yield* fs.writeFileString(toolPath, generateToolContent(repoNames));
-				yield* fs.writeFileString(agentPath, generateAgentContent(repoNames));
+				yield* fs.writeFileString(toolPath, generateToolContent(repoInfos));
+				yield* fs.writeFileString(agentPath, generateAgentContent(repoInfos));
 
 				return { toolPath, agentPath };
 			}),
