@@ -18,6 +18,8 @@ jobs:
   validate:
     runs-on: depot-ubuntu-24.04-arm-4
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
