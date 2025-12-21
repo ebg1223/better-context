@@ -6,10 +6,17 @@ export interface Repo {
 	searchPath?: string | undefined;
 }
 
-export type InputState = {
-	type: 'text' | 'command' | 'mention';
-	content: string;
-}[];
+export type InputState = (
+	| {
+			type: 'text' | 'command' | 'mention';
+			content: string;
+	  }
+	| {
+			type: 'pasted';
+			content: string;
+			lines: number;
+	  }
+)[];
 
 export type Message =
 	| {

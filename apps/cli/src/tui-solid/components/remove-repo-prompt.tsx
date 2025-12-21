@@ -1,4 +1,4 @@
-import { Show, For, type Component } from 'solid-js';
+import { Show, For, createSignal, createMemo, createEffect, type Component } from 'solid-js';
 import { colors } from '../theme.ts';
 import { useKeyboard } from '@opentui/solid';
 import { useAppContext } from '../context/app-context.tsx';
@@ -6,6 +6,35 @@ import { services } from '../services.ts';
 
 export const RemoveRepoPrompt: Component = () => {
 	const appState = useAppContext();
+
+	const [selectedIndex, setSelectedIndex] = createSignal(0);
+	const [filterText, setFilterText] = createSignal('');
+
+	const maxVisible = 8;
+
+	const filteredRepos = createMemo(() => {
+		const repos = appState.repos();
+		const filter = filterText().toLowerCase();
+		if (!filter) return repos;
+		return repos.filter((repo) => repo.name.toLowerCase().includes(filter));
+	});
+
+	// Reset selection when filter changes
+	createEffect(() => {
+		filterText();
+		setSelectedIndex(0);
+	});
+
+	const visibleRange = createMemo(() => {
+		const start = Math.max(
+			0,
+			Math.min(selectedIndex() - Math.floor(maxVisible / 2), filteredRepos().length - maxVisible)
+		);
+		return {
+			start,
+			repos: filteredRepos().slice(start, start + maxVisible)
+		};
+	});
 
 	const handleRemoveRepo = async () => {
 		const repoName = appState.removeRepoName();
@@ -20,12 +49,21 @@ export const RemoveRepoPrompt: Component = () => {
 		} finally {
 			appState.setMode('chat');
 			appState.setRemoveRepoName('');
+			setFilterText('');
 		}
 	};
 
 	const cancelMode = () => {
 		appState.setMode('chat');
 		appState.setRemoveRepoName('');
+		setFilterText('');
+	};
+
+	const selectRepo = () => {
+		const selectedRepo = filteredRepos()[selectedIndex()];
+		if (selectedRepo) {
+			appState.setRemoveRepoName(selectedRepo.name);
+		}
 	};
 
 	useKeyboard((key) => {
@@ -36,6 +74,34 @@ export const RemoveRepoPrompt: Component = () => {
 				handleRemoveRepo();
 			} else if (key.name === 'n' || key.raw === 'N') {
 				cancelMode();
+			}
+		} else {
+			switch (key.name) {
+				case 'up':
+					if (selectedIndex() > 0) {
+						setSelectedIndex(selectedIndex() - 1);
+					} else {
+						setSelectedIndex(filteredRepos().length - 1);
+					}
+					break;
+				case 'down':
+					if (selectedIndex() < filteredRepos().length - 1) {
+						setSelectedIndex(selectedIndex() + 1);
+					} else {
+						setSelectedIndex(0);
+					}
+					break;
+				case 'return':
+					selectRepo();
+					break;
+				case 'backspace':
+					setFilterText(filterText().slice(0, -1));
+					break;
+				default:
+					if (key.raw && key.raw.length === 1 && key.raw.match(/[a-zA-Z0-9-_]/)) {
+						setFilterText(filterText() + key.raw);
+					}
+					break;
 			}
 		}
 	});
@@ -49,6 +115,9 @@ export const RemoveRepoPrompt: Component = () => {
 						position: 'absolute',
 						top: '50%',
 						left: '50%',
+						height: 20,
+						marginLeft: -25,
+						marginTop: -10,
 						width: 50,
 						backgroundColor: colors.bgSubtle,
 						border: true,
@@ -59,29 +128,23 @@ export const RemoveRepoPrompt: Component = () => {
 				>
 					<text fg={colors.error} content=" Remove Repo" />
 					<text content="" style={{ height: 1 }} />
-					<text fg={colors.text} content=" Type repo name to remove:" />
-					<text content="" style={{ height: 1 }} />
-					<For each={appState.repos()}>
-						{(repo) => <text fg={colors.textSubtle} content={`  @${repo.name}`} />}
-					</For>
-					<text content="" style={{ height: 1 }} />
-					<input
-						placeholder="repo name"
-						placeholderColor={colors.textSubtle}
-						textColor={colors.text}
-						value=""
-						onInput={(value) => {
-							// Don't update state here, just capture
-						}}
-						onSubmit={(value) => {
-							const repo = appState.repos().find((r) => r.name.toLowerCase() === value.toLowerCase());
-							if (repo) {
-								appState.setRemoveRepoName(repo.name);
-							}
-						}}
-						focused={true}
-						style={{ height: 1, width: '100%', marginTop: 1 }}
+					<text
+						fg={colors.textMuted}
+						content={filterText() ? ` Filter: ${filterText()}` : ' Type to filter, ↑↓ to select'}
 					/>
+					<text content="" style={{ height: 1 }} />
+					<For each={visibleRange().repos}>
+						{(repo, i) => {
+							const actualIndex = () => visibleRange().start + i();
+							const isSelected = () => actualIndex() === selectedIndex();
+							return (
+								<text
+									fg={isSelected() ? colors.accent : colors.text}
+									content={isSelected() ? `▸ ${repo.name}` : `  ${repo.name}`}
+								/>
+							);
+						}}
+					</For>
 				</box>
 			}
 		>

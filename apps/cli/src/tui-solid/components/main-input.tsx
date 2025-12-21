@@ -1,6 +1,7 @@
 import { For, Show, type Component } from 'solid-js';
-import { colors } from '../theme';
+import { colors, getColor } from '../theme';
 import { useAppContext } from '../context/app-context';
+import { usePaste } from '@opentui/solid';
 
 export const MainInput: Component = () => {
 	const appState = useAppContext();
@@ -8,21 +9,23 @@ export const MainInput: Component = () => {
 	const getValue = () =>
 		appState
 			.inputState()
-			.map((p) => p.content)
+			.map((p) => {
+				if (p.type === 'pasted') {
+					return `pasted ${p.lines} lines`;
+				} else {
+					return p.content;
+				}
+			})
 			.join('');
 
 	const isEmpty = () => getValue().length === 0;
 
-	const getColor = (type: 'text' | 'command' | 'mention') => {
-		switch (type) {
-			case 'mention':
-				return colors.accent;
-			case 'command':
-				return '#FFD700'; // gold
-			default:
-				return colors.text;
-		}
-	};
+	usePaste((text) => {
+		const curInput = appState.inputState();
+		const lines = text.text.split('\n').length;
+		const newInput = [...curInput, { type: 'pasted' as const, content: text.text, lines }];
+		appState.setInputState(newInput);
+	});
 
 	function parseInputValue(value: string): ReturnType<typeof appState.inputState> {
 		if (!value) return [];
@@ -77,6 +80,14 @@ export const MainInput: Component = () => {
 					paddingLeft: 1,
 					paddingRight: 1
 				}}
+				onMouseDown={(e) => {
+					const inputRef = appState.inputRef();
+					if (!inputRef) return;
+					inputRef.cursorPosition = e.x - 1;
+					queueMicrotask(() => {
+						appState.setCursorPosition(inputRef.cursorPosition);
+					});
+				}}
 			>
 				<Show
 					when={!isEmpty()}
@@ -85,7 +96,16 @@ export const MainInput: Component = () => {
 					}
 				>
 					<For each={appState.inputState()}>
-						{(part) => <span style={{ fg: getColor(part.type) }}>{part.content}</span>}
+						{(part) => {
+							// console.log('part', part);
+							if (part.type === 'pasted') {
+								return (
+									<span style={{ fg: colors.textPasted }}>{`pasted ${part.lines} lines`}</span>
+								);
+							} else {
+								return <span style={{ fg: getColor(part.type) }}>{part.content}</span>;
+							}
+						}}
 					</For>
 				</Show>
 			</text>
@@ -93,6 +113,7 @@ export const MainInput: Component = () => {
 			<input
 				id="main-input"
 				onInput={(v) => {
+					console.log('v', v);
 					const parts = parseInputValue(v);
 					appState.setInputState(parts);
 				}}
@@ -104,16 +125,8 @@ export const MainInput: Component = () => {
 					});
 				}}
 				value={getValue()}
-				focused={true}
+				focused={appState.mode() === 'chat'}
 				ref={(r) => appState.setInputRef(r)}
-				onMouseDown={(e) => {
-					const inputRef = appState.inputRef();
-					if (!inputRef) return;
-					inputRef.cursorPosition = e.x - 2;
-					queueMicrotask(() => {
-						appState.setCursorPosition(inputRef.cursorPosition);
-					});
-				}}
 				// Make input text transparent so styled overlay shows through
 				textColor="transparent"
 				backgroundColor="transparent"

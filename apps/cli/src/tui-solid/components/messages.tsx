@@ -1,17 +1,6 @@
 import { For, Show, type Component } from 'solid-js';
 import { useAppContext } from '../context/app-context';
-import { colors } from '../theme';
-
-const getColor = (type: 'text' | 'command' | 'mention') => {
-	switch (type) {
-		case 'mention':
-			return colors.accent;
-		case 'command':
-			return '#FFD700';
-		default:
-			return colors.text;
-	}
-};
+import { colors, getColor } from '../theme';
 
 export const Messages: Component = () => {
 	const appState = useAppContext();
