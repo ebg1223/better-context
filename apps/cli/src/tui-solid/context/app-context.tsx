@@ -26,6 +26,8 @@ type Message =
 
 type AppState = {
 	inputState: Accessor<InputState>;
+	setCursorPosition: (position: number) => void;
+	cursorIsCurrentlyIn: Accessor<InputState[number]['type']>;
 	setInputState: (state: InputState) => void;
 	selectedModel: Accessor<string>;
 	selectedProvider: Accessor<string>;
@@ -63,11 +65,25 @@ export const AppProvider = (props: { children: JSX.Element }) => {
 	const [messageStore, setMessageStore] = createStore<{ messages: Message[] }>({
 		messages: defaultMessageHistory
 	});
+	const [cursorPosition, setCursorPosition] = createSignal(0);
 
 	const [inputStore, setInputStore] = createSignal<InputState>([]);
 
 	const state: AppState = {
 		inputState: inputStore,
+		setCursorPosition,
+		cursorIsCurrentlyIn: () => {
+			let curIdx = 0;
+			let minIdx = 0;
+			while (true) {
+				const curItem = inputStore()[curIdx];
+				if (!curItem) return 'text';
+				const maxIdx = minIdx + curItem.content.length;
+				if (cursorPosition() >= minIdx && cursorPosition() <= maxIdx) return curItem.type;
+				minIdx = maxIdx;
+				curIdx++;
+			}
+		},
 		setInputState: setInputStore,
 		selectedModel,
 		selectedProvider,

@@ -1,10 +1,14 @@
-import { createSignal, type Component, type JSX } from 'solid-js';
+import { createEffect, createSignal, type Component, type JSX } from 'solid-js';
 import { AppProvider } from './context/app-context';
 import { render, useKeyboard, useRenderer } from '@opentui/solid';
 import { MainUi } from '.';
 import { ConsolePosition } from '@opentui/core';
 import { useAppContext } from './context/app-context.tsx';
-import { onMount } from 'solid-js';
+
+// TODO:
+// - make the command palette and repo mention have arrows up and down to navigate
+// - connect this up to the core process for command exec
+// - probably gonna fully rebuild the way the core instance works...
 
 const AppWrapper: Component<{
 	children: JSX.Element;
@@ -20,6 +24,10 @@ const App: Component = () => {
 	const appState = useAppContext();
 
 	const [heightPercent, setHeightPercent] = createSignal<`${number}%`>('100%');
+
+	createEffect(() => {
+		console.log(appState.cursorIsCurrentlyIn());
+	});
 
 	useKeyboard((key) => {
 		if (key.name === 'c' && key.ctrl) {

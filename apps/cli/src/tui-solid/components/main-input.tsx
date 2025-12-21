@@ -1,7 +1,8 @@
-import { For, Show, type Component } from 'solid-js';
+import { createEffect, For, Show, type Component } from 'solid-js';
 import { colors } from '../theme';
 import type { InputRenderable } from '@opentui/core';
 import { useAppContext } from '../context/app-context';
+import { useKeyboard } from '@opentui/solid';
 
 export const MainInput: Component = () => {
 	const appState = useAppContext();
@@ -30,23 +31,25 @@ export const MainInput: Component = () => {
 		if (!value) return [];
 		const parts: { type: 'text' | 'command' | 'mention'; content: string }[] = [];
 
-		// Regex to match @mentions and /commands
-		const regex = /(^|(?<=\s))(@\w*|\/\w*)/g;
+		if (value.startsWith('/')) {
+			const spaceIndex = value.indexOf(' ');
+			if (spaceIndex === -1) {
+				parts.push({ type: 'command', content: value });
+			} else {
+				parts.push({ type: 'command', content: value.slice(0, spaceIndex) });
+				parts.push({ type: 'text', content: value.slice(spaceIndex) });
+			}
+			return parts;
+		}
+
+		const regex = /(^|(?<=\s))@\w*/g;
 		let lastIndex = 0;
 		let match;
 		while ((match = regex.exec(value)) !== null) {
-			// Add text before the match
 			if (match.index > lastIndex) {
 				parts.push({ type: 'text', content: value.slice(lastIndex, match.index) });
 			}
-
-			// Add the mention or command
-			const token = match[0];
-			if (token.startsWith('@')) {
-				parts.push({ type: 'mention', content: token });
-			} else if (token.startsWith('/')) {
-				parts.push({ type: 'command', content: token });
-			}
+			parts.push({ type: 'mention', content: match[0] });
 			lastIndex = regex.lastIndex;
 		}
 
@@ -96,11 +99,19 @@ export const MainInput: Component = () => {
 					const parts = parseInputValue(v);
 					appState.setInputState(parts);
 				}}
+				onKeyDown={() => {
+					queueMicrotask(() => {
+						appState.setCursorPosition(inputRef.cursorPosition);
+					});
+				}}
 				value={getValue()}
 				focused={true}
 				ref={(r) => (inputRef = r)}
 				onMouseDown={(e) => {
 					if (inputRef) inputRef.cursorPosition = e.x - 2;
+					queueMicrotask(() => {
+						appState.setCursorPosition(inputRef.cursorPosition);
+					});
 				}}
 				// Make input text transparent so styled overlay shows through
 				textColor="transparent"
