@@ -2,14 +2,16 @@ import { colors } from './theme.ts';
 import { MainInput } from './components/main-input.tsx';
 import { StatusBar } from './components/status-bar.tsx';
 import { Messages } from './components/messages.tsx';
-import type { Component } from 'solid-js';
+import type { Accessor, Component } from 'solid-js';
 import { Header } from './components/header.tsx';
 
-export const MainUi: Component = () => {
+export const MainUi: Component<{
+	heightPercent: Accessor<`${number}%`>;
+}> = (props) => {
 	return (
 		<box
 			width="100%"
-			height="100%"
+			height={props.heightPercent()}
 			style={{
 				flexDirection: 'column',
 				backgroundColor: colors.bg

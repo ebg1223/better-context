@@ -5,6 +5,11 @@
 import { createContext, createSignal, useContext, type Accessor, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 
+type InputState = {
+	type: 'text' | 'command' | 'mention';
+	content: string;
+}[];
+
 type Message =
 	| {
 			role: 'user';
@@ -20,6 +25,8 @@ type Message =
 	  };
 
 type AppState = {
+	inputState: Accessor<InputState>;
+	setInputState: (state: InputState) => void;
 	selectedModel: Accessor<string>;
 	selectedProvider: Accessor<string>;
 	setModel: (model: string) => void;
@@ -34,91 +41,6 @@ const defaultMessageHistory: Message[] = [
 		role: 'system',
 		content:
 			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
-	},
-	{
-		role: 'system',
-		content:
-			"Welcome to btca! Ask anything about the library/framework you're interested in (make sure you @ it first)"
-	},
-	{
-		role: 'assistant',
-		content: 'Hello! How can I help you today?'
 	}
 ];
 
@@ -138,12 +60,15 @@ export const AppProvider = (props: { children: JSX.Element }) => {
 	// TODO: get these from the actual core process
 	const [selectedModel, setSelectedModel] = createSignal('claude-haiku-4-5');
 	const [selectedProvider, setSelectedProvider] = createSignal('anthropic');
-
 	const [messageStore, setMessageStore] = createStore<{ messages: Message[] }>({
 		messages: defaultMessageHistory
 	});
 
+	const [inputStore, setInputStore] = createSignal<InputState>([]);
+
 	const state: AppState = {
+		inputState: inputStore,
+		setInputState: setInputStore,
 		selectedModel,
 		selectedProvider,
 		messageHistory: messageStore.messages,
