@@ -17,8 +17,8 @@ import markdown from '@shikijs/langs/markdown';
 import sql from '@shikijs/langs/sql';
 import diff from '@shikijs/langs/diff';
 
-// Import theme
-import vitesseDark from '@shikijs/themes/vitesse-dark';
+// Import theme (dark-plus matches the web app)
+import darkPlus from '@shikijs/themes/dark-plus';
 
 // Color options type used throughout the renderer
 export interface ColorOptions {
@@ -35,9 +35,11 @@ export interface ColorOptions {
 export interface StyledChunk {
 	text: string;
 	fg?: string;
+	bg?: string;
 	bold?: boolean;
 	italic?: boolean;
 	underline?: boolean;
+	isCodeBlock?: boolean; // Flag to indicate this is part of a code block
 }
 
 const SUPPORTED_LANGS = [
@@ -85,7 +87,7 @@ async function getHighlighter(): Promise<HighlighterCore> {
 				sql,
 				diff
 			],
-			themes: [vitesseDark],
+			themes: [darkPlus],
 			engine: createJavaScriptRegexEngine()
 		});
 	}
@@ -209,22 +211,33 @@ async function tokenToChunks(
 		case 'code': {
 			const t = token as Tokens.Code;
 			const lang = t.lang ? normalizeLanguage(t.lang) : 'text';
+			const codeBg = '#1e1e1e'; // VS Code dark background
 
 			if (SUPPORTED_LANGS.includes(lang) || SUPPORTED_LANGS.includes(t.lang || '')) {
 				try {
 					const hast = highlighter.codeToHast(t.text, {
 						lang: lang,
-						theme: 'vitesse-dark'
+						theme: 'dark-plus'
 					});
 					const codeChunks = shikiHastToChunks(hast);
-					return [{ text: '\n' }, ...codeChunks, { text: '\n' }];
+					// Mark all chunks as code block and add background
+					const styledCodeChunks = codeChunks.map((c) => ({
+						...c,
+						bg: codeBg,
+						isCodeBlock: true
+					}));
+					return [{ text: '\n' }, ...styledCodeChunks, { text: '\n' }];
 				} catch {
 					// Fall through to plain code block
 				}
 			}
 
 			// Fallback: plain code block
-			return [{ text: '\n' }, { text: t.text, fg: colors.success }, { text: '\n' }];
+			return [
+				{ text: '\n' },
+				{ text: t.text, fg: colors.success, bg: codeBg, isCodeBlock: true },
+				{ text: '\n' }
+			];
 		}
 
 		case 'codespan': {
@@ -261,8 +274,14 @@ async function tokenToChunks(
 
 				for (const subToken of item?.tokens || []) {
 					const subChunks = await tokenToChunks(subToken, highlighter, colors, styles);
-					chunks.push(...subChunks);
+					// Filter out trailing newlines from sub-tokens since we add our own
+					const filtered = subChunks.filter(
+						(c, idx) => !(idx === subChunks.length - 1 && c.text === '\n')
+					);
+					chunks.push(...filtered);
 				}
+				// Add newline after each list item
+				chunks.push({ text: '\n' });
 			}
 
 			return chunks;
