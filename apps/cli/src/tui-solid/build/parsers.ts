@@ -1,22 +1,17 @@
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import type { FiletypeParserOptions } from '@opentui/core';
 
-import markdown_wasm from '@opentui/core/assets/markdown/tree-sitter-markdown.wasm' with { type: 'file' };
-import markdown_highlights from '@opentui/core/assets/markdown/highlights.scm' with { type: 'file' };
-import markdown_injections from '@opentui/core/assets/markdown/injections.scm' with { type: 'file' };
-import markdown_inline_wasm from '@opentui/core/assets/markdown_inline/tree-sitter-markdown_inline.wasm' with { type: 'file' };
-import markdown_inline_highlights from '@opentui/core/assets/markdown_inline/highlights.scm' with { type: 'file' };
-
 export function getParsers(): FiletypeParserOptions[] {
-	const base = dirname(fileURLToPath(import.meta.url));
 	return [
 		{
 			filetype: 'markdown',
-			wasm: resolve(base, markdown_wasm),
+			wasm: 'https://github.com/tree-sitter-grammars/tree-sitter-markdown/releases/download/v0.5.1/tree-sitter-markdown.wasm',
 			queries: {
-				highlights: [resolve(base, markdown_highlights)],
-				injections: [resolve(base, markdown_injections)]
+				highlights: [
+					'https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/master/queries/markdown/highlights.scm'
+				],
+				injections: [
+					'https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/master/queries/markdown/injections.scm'
+				]
 			},
 			injectionMapping: {
 				nodeTypes: { inline: 'markdown_inline', pipe_table_cell: 'markdown_inline' },
@@ -25,8 +20,12 @@ export function getParsers(): FiletypeParserOptions[] {
 		},
 		{
 			filetype: 'markdown_inline',
-			wasm: resolve(base, markdown_inline_wasm),
-			queries: { highlights: [resolve(base, markdown_inline_highlights)] }
+			wasm: 'https://github.com/tree-sitter-grammars/tree-sitter-markdown/releases/download/v0.5.1/tree-sitter-markdown_inline.wasm',
+			queries: {
+				highlights: [
+					'https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/99ddf573531c4dbe53f743ecbc1595af5eb1d32f/queries/markdown_inline/highlights.scm'
+				]
+			}
 		}
 	];
 }

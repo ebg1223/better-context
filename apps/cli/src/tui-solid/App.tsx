@@ -155,6 +155,11 @@ const App: Component = () => {
 			return;
 		}
 
+		if (key.name === 'q' && key.ctrl) {
+			renderer.destroy();
+			return;
+		}
+
 		// Escape handling for modes
 		if (key.name === 'escape') {
 			if (appState.mode() !== 'chat' && appState.mode() !== 'loading') {

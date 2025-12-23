@@ -11,6 +11,8 @@ import { AddRepoWizard } from './components/add-repo-wizard.tsx';
 import { RemoveRepoPrompt } from './components/remove-repo-prompt.tsx';
 import { ModelConfig } from './components/model-config.tsx';
 import { BlessedModelSelect } from './components/blessed-model-select.tsx';
+import { addDefaultParsers } from '@opentui/core';
+import { getParsers } from './build/parsers.ts';
 
 export const MainUi: Component<{
 	heightPercent: Accessor<`${number}%`>;
@@ -58,5 +60,7 @@ export const MainUi: Component<{
 };
 
 export async function launchTui() {
+	addDefaultParsers(getParsers());
+
 	await import('./App.tsx');
 }
