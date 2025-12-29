@@ -2,25 +2,20 @@ import { FileSystem, Path } from '@effect/platform';
 import { Effect } from 'effect';
 import { ConfigService } from './config.ts';
 import { SyncError } from '../lib/errors.ts';
-import { generateToolContent, generateAgentContent, type RepoInfo } from '../lib/templates.ts';
+import { generateSkillContent, type RepoInfo } from '../lib/templates.ts';
 import { expandHome } from '../lib/utils/files.ts';
 
 const OPENCODE_CONFIG_DIR = '~/.config/opencode';
-const TOOL_DIR = '~/.config/opencode/tool';
-const AGENT_DIR = '~/.config/opencode/agent';
-const TOOL_FILENAME = 'btca.ts';
-const AGENT_FILENAME = 'btca-docs.md';
+const SKILL_DIR = '~/.config/opencode/skill/btca';
+const SKILL_FILENAME = 'SKILL.md';
 
 const syncService = Effect.gen(function* () {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
 	const config = yield* ConfigService;
 
-	const getToolPath = () =>
-		expandHome(TOOL_DIR).pipe(Effect.map((dir) => path.join(dir, TOOL_FILENAME)));
-
-	const getAgentPath = () =>
-		expandHome(AGENT_DIR).pipe(Effect.map((dir) => path.join(dir, AGENT_FILENAME)));
+	const getSkillPath = () =>
+		expandHome(SKILL_DIR).pipe(Effect.map((dir) => path.join(dir, SKILL_FILENAME)));
 
 	const checkOpenCodeInstalled = () =>
 		Effect.gen(function* () {
@@ -52,36 +47,32 @@ const syncService = Effect.gen(function* () {
 					specialNotes: r.specialNotes
 				}));
 
-				// Ensure directories exist
-				const toolDir = yield* expandHome(TOOL_DIR);
-				const agentDir = yield* expandHome(AGENT_DIR);
-				yield* fs.makeDirectory(toolDir, { recursive: true });
-				yield* fs.makeDirectory(agentDir, { recursive: true });
+				// Ensure skill directory exists
+				const skillDir = yield* expandHome(SKILL_DIR);
+				yield* fs.makeDirectory(skillDir, { recursive: true });
 
-				// Generate and write files
-				const toolPath = yield* getToolPath();
-				const agentPath = yield* getAgentPath();
+				// Generate and write skill file
+				const skillPath = yield* getSkillPath();
+				yield* fs.writeFileString(skillPath, generateSkillContent(repoInfos));
 
-				yield* fs.writeFileString(toolPath, generateToolContent(repoInfos));
-				yield* fs.writeFileString(agentPath, generateAgentContent(repoInfos));
-
-				return { toolPath, agentPath };
+				return { skillPath };
 			}),
 
 		unsync: () =>
 			Effect.gen(function* () {
-				const toolPath = yield* getToolPath();
-				const agentPath = yield* getAgentPath();
+				const skillPath = yield* getSkillPath();
+				const skillDir = yield* expandHome(SKILL_DIR);
 
 				const removed: string[] = [];
 
-				if (yield* fs.exists(toolPath)) {
-					yield* fs.remove(toolPath);
-					removed.push(toolPath);
+				if (yield* fs.exists(skillPath)) {
+					yield* fs.remove(skillPath);
+					removed.push(skillPath);
 				}
-				if (yield* fs.exists(agentPath)) {
-					yield* fs.remove(agentPath);
-					removed.push(agentPath);
+
+				// Try to remove the btca skill directory if empty
+				if (yield* fs.exists(skillDir)) {
+					yield* fs.remove(skillDir).pipe(Effect.ignore);
 				}
 
 				return { removed };
@@ -89,9 +80,8 @@ const syncService = Effect.gen(function* () {
 
 		isSynced: () =>
 			Effect.gen(function* () {
-				const toolPath = yield* getToolPath();
-				const agentPath = yield* getAgentPath();
-				return (yield* fs.exists(toolPath)) && (yield* fs.exists(agentPath));
+				const skillPath = yield* getSkillPath();
+				return yield* fs.exists(skillPath);
 			})
 	};
 });

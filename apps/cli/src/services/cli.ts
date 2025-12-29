@@ -222,7 +222,7 @@ const repoBranchOption = Options.text('branch').pipe(
 	Options.withDefault('main')
 );
 const repoNotesOption = Options.text('notes').pipe(Options.optional);
-const syncAfterAddOption = Options.boolean('sync').pipe(Options.withDefault(false));
+const syncSkillAfterAddOption = Options.boolean('sync-skill').pipe(Options.withDefault(false));
 
 const configReposAddCommand = Command.make(
 	'add',
@@ -231,9 +231,9 @@ const configReposAddCommand = Command.make(
 		url: repoUrlOption.pipe(Options.optional),
 		branch: repoBranchOption,
 		notes: repoNotesOption,
-		sync: syncAfterAddOption
+		syncSkill: syncSkillAfterAddOption
 	},
-	({ name, url, branch, notes, sync }) =>
+	({ name, url, branch, notes, syncSkill }) =>
 		Effect.gen(function* () {
 			const config = yield* ConfigService;
 
@@ -276,12 +276,10 @@ const configReposAddCommand = Command.make(
 				console.log(`  Notes: ${notes.value}`);
 			}
 
-			if (sync) {
+			if (syncSkill) {
 				const syncService = yield* SyncService;
 				const result = yield* syncService.sync();
-				console.log('Synced to OpenCode:');
-				console.log(`  Tool:  ${result.toolPath}`);
-				console.log(`  Agent: ${result.agentPath}`);
+				console.log(`Synced skill to OpenCode: ${result.skillPath}`);
 			}
 		}).pipe(
 			Effect.catchTags({
@@ -468,14 +466,12 @@ const configCommand = Command.make('config', {}, () =>
 	}).pipe(Effect.provide(programLayer))
 ).pipe(Command.withSubcommands([configModelCommand, configReposCommand]));
 
-// === Sync Command ===
-const syncCommand = Command.make('sync', {}, () =>
+// === Sync Skill Command ===
+const syncSkillCommand = Command.make('sync-skill', {}, () =>
 	Effect.gen(function* () {
 		const sync = yield* SyncService;
 		const result = yield* sync.sync();
-		console.log('Synced btca to OpenCode:');
-		console.log(`  Tool:  ${result.toolPath}`);
-		console.log(`  Agent: ${result.agentPath}`);
+		console.log(`Synced btca skill to OpenCode: ${result.skillPath}`);
 	}).pipe(
 		Effect.catchTag('SyncError', (e) =>
 			Effect.sync(() => {
@@ -487,8 +483,8 @@ const syncCommand = Command.make('sync', {}, () =>
 	)
 );
 
-// === Unsync Command ===
-const unsyncCommand = Command.make('unsync', {}, () =>
+// === Unsync Skill Command ===
+const unsyncSkillCommand = Command.make('unsync-skill', {}, () =>
 	Effect.gen(function* () {
 		const sync = yield* SyncService;
 
@@ -512,9 +508,9 @@ const unsyncCommand = Command.make('unsync', {}, () =>
 			}
 		}
 	}).pipe(
-		Effect.catchTag('SyncError', (e) =>
+		Effect.catchAll((e) =>
 			Effect.sync(() => {
-				console.error(`Error: ${e.message}`);
+				console.error(`Error: ${e}`);
 				process.exit(1);
 			})
 		),
@@ -537,7 +533,16 @@ const mainCommand = Command.make('btca', { version: versionOption }, ({ version 
 			console.log(`btca v${VERSION}. run btca --help for more information.`);
 		}
 	})
-).pipe(Command.withSubcommands([askCommand, serveCommand, chatCommand, configCommand, syncCommand, unsyncCommand]));
+).pipe(
+	Command.withSubcommands([
+		askCommand,
+		serveCommand,
+		chatCommand,
+		configCommand,
+		syncSkillCommand,
+		unsyncSkillCommand
+	])
+);
 
 const cliService = Effect.gen(function* () {
 	return {
