@@ -279,7 +279,10 @@ const configReposAddCommand = Command.make(
 			if (syncSkill) {
 				const syncService = yield* SyncService;
 				const result = yield* syncService.sync();
-				console.log(`Synced skill to OpenCode: ${result.skillPath}`);
+				console.log('Synced btca skill:');
+				for (const { target, path } of result.synced) {
+					console.log(`  ${target}: ${path}`);
+				}
 			}
 		}).pipe(
 			Effect.catchTags({
@@ -471,7 +474,10 @@ const syncSkillCommand = Command.make('sync-skill', {}, () =>
 	Effect.gen(function* () {
 		const sync = yield* SyncService;
 		const result = yield* sync.sync();
-		console.log(`Synced btca skill to OpenCode: ${result.skillPath}`);
+		console.log('Synced btca skill:');
+		for (const { target, path } of result.synced) {
+			console.log(`  ${target}: ${path}`);
+		}
 	}).pipe(
 		Effect.catchTag('SyncError', (e) =>
 			Effect.sync(() => {
@@ -490,7 +496,7 @@ const unsyncSkillCommand = Command.make('unsync-skill', {}, () =>
 
 		const isSynced = yield* sync.isSynced();
 		if (!isSynced) {
-			console.log('Nothing to unsync. btca is not synced to OpenCode.');
+			console.log('Nothing to unsync. btca is not synced.');
 			return;
 		}
 
